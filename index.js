@@ -1,10 +1,13 @@
 const express = require('express')
 const app = express()
 const mongoose = require('mongoose')
+const bcrypt = require('bcrypt')
+const dotenv = require('dotenv')
+dotenv.config()
 
 async function dbConnect() {
   try {
-    await mongoose.connect('')
+    await mongoose.connect(process.env.mongouri)
     console.log("connected")
   } catch (err) {
     console.log(err)
@@ -12,19 +15,18 @@ async function dbConnect() {
 }
 dbConnect()
 
-// Schema
-const Users = new mongoose.Schema({
+
+const userSchema = new mongoose.Schema({
   Name: String,
   Email: String,
   Password: String
 })
 
-const User = mongoose.model("User", Users)
+const User = mongoose.model("User", userSchema)
 
 app.use(express.static(__dirname + '/public'))
 app.use(express.urlencoded({ extended: true }))
 
-// Routes
 app.get('/', (req, res) => {
   res.sendFile(__dirname + '/public/home.html')
 })
@@ -41,15 +43,15 @@ app.get('/reciepe', (req, res) => {
   res.sendFile(__dirname + '/public/reciepe.html')
 })
 
-// Signup
 app.post('/signupSubmit', async (req, res) => {
   const { name, email, password } = req.body
+  const hashedpass = await bcrypt.hash(password,10)
 
   try {
     await User.create({
       Name: name,
       Email: email,
-      Password: password
+      Password: hashedpass
     })
     res.redirect('/login')
   } catch (err) {
@@ -58,14 +60,14 @@ app.post('/signupSubmit', async (req, res) => {
   }
 })
 
-// Login
 app.post('/loginSubmit', async (req, res) => {
   const { email, password } = req.body
 
   try {
-    const cred = await User.findOne({ Email: email, Password: password })
+    const cred = await User.findOne({ Email: email})
+    const passmatch = await bcrypt.compare(password,cred.Password)
 
-    if (cred) {
+    if (cred && passmatch) {
       res.redirect('/reciepe')
     } else {
       res.send("Invalid email or password")
